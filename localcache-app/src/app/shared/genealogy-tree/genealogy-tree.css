@@ -15,41 +15,17 @@ h2 {
   color: #b00020;
 }
 
-.node-row,
-.node-editor {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.tree-record {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-.node-editor {
-  flex-wrap: wrap;
-}
-
-.node-editor label {
-  display: grid;
-  gap: 0.25rem;
-}
-
-.operation-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: #555;
-  font-size: 0.875rem;
-}
-
-.operation-spinner {
-  width: 0.9rem;
-  height: 0.9rem;
-  border: 2px solid #ccc;
-  border-top-color: #333;
-  border-radius: 50%;
-  animation: operation-spin 0.7s linear infinite;
-}
-
-@keyframes operation-spin {
-  to {
-    transform: rotate(360deg);
-  }
+.tree-record:hover,
+.tree-record:focus-visible {
+  text-decoration: underline;
 }

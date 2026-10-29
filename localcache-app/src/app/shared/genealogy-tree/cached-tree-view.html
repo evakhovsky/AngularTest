@@ -1,0 +1,137 @@
+<section class="cached-card" [attr.aria-busy]="applying() || resetting()">
+  <div class="cached-header">
+    <div>
+      <h2>Cached Tree View</h2>
+      <p>Click a database-tree name to cache it. Missing ancestors are shown as an ellipsis.</p>
+    </div>
+    <div class="toolbar">
+      <button
+        type="button"
+        [disabled]="applying() || resetting() || changedCount() === 0"
+        (click)="applyChanges()"
+      >
+        {{ applying() ? 'Applying...' : 'Apply changes' }}
+      </button>
+      <button
+        type="button"
+        [disabled]="applying() || resetting() || changedCount() === 0"
+        (click)="discardChanges()"
+      >
+        Discard staged
+      </button>
+      @if (confirmReset()) {
+        <button type="button" [disabled]="resetting()" (click)="resetDatabase()">
+          {{ resetting() ? 'Resetting...' : 'Confirm reset' }}
+        </button>
+        <button type="button" [disabled]="resetting()" (click)="cancelReset()">Cancel</button>
+      } @else {
+        <button type="button" [disabled]="applying() || resetting()" (click)="resetDatabase()">
+          Reset to original
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+  @if (message()) {
+    <p class="message" role="status">{{ message() }}</p>
+  }
+  @if (confirmReset()) {
+    <p class="reset-warning" role="alert">
+      This restores the shared database to its original snapshot and discards all applied changes.
+      Click Confirm reset to continue.
+    </p>
+  }
+
+  @if (changedCount() > 0) {
+    <p class="change-count">{{ changedCount() }} staged change(s)</p>
+  }
+
+  @if (treeNodes().length) {
+    <p-tree [value]="treeNodes()">
+      <ng-template pTemplate="default" let-node>
+        @if (node.data.isContext) {
+          <div class="context-entry">
+            <span class="gap-marker" aria-label="Uncached ancestors">...</span>
+          </div>
+        } @else {
+          <div
+            class="cached-entry"
+            [class.pending-deletion]="node.data.isDeleted"
+            [class.modified]="isChanged(node.data) && !node.data.isDeleted"
+          >
+            <div class="entry-fields">
+              <label>
+                Name
+                <input
+                  [disabled]="node.data.isDeleted || applying() || resetting()"
+                  [(ngModel)]="node.data.name"
+                  (ngModelChange)="onFieldChanged()"
+                />
+              </label>
+              <label>
+                Birth year
+                <input
+                  type="number"
+                  step="1"
+                  [disabled]="node.data.isDeleted || applying() || resetting()"
+                  [(ngModel)]="node.data.birthYear"
+                  (ngModelChange)="onFieldChanged()"
+                />
+              </label>
+              <label>
+                Generation title
+                <input
+                  [disabled]="node.data.isDeleted || applying() || resetting()"
+                  [(ngModel)]="node.data.generationTitle"
+                  (ngModelChange)="onFieldChanged()"
+                />
+              </label>
+            </div>
+            <div class="entry-actions">
+              @if (node.data.isNew) {
+                <span class="change-marker">New</span>
+              } @else if (node.data.isDeleted) {
+                <span class="delete-marker">Marked for deletion</span>
+              } @else if (isChanged(node.data)) {
+                <span class="change-marker">Modified</span>
+              }
+              <button
+                type="button"
+                [disabled]="node.data.isDeleted || applying() || resetting()"
+                (click)="addChild(node.data)"
+              >
+                Add child
+              </button>
+              <button
+                type="button"
+                [disabled]="node.data.isDeleted || applying() || resetting()"
+                (click)="addSibling(node.data)"
+              >
+                Add sibling
+              </button>
+              <button
+                type="button"
+                [disabled]="applying() || resetting()"
+                (click)="toggleDeleted(node.data)"
+              >
+                {{ node.data.isDeleted ? 'Undo delete' : 'Mark for deletion' }}
+              </button>
+              <button
+                type="button"
+                [disabled]="applying() || resetting()"
+                (click)="removeFromCache(node.data)"
+              >
+                Remove from cache
+              </button>
+            </div>
+          </div>
+        }
+      </ng-template>
+    </p-tree>
+  } @else {
+    <p class="empty-state">No nodes cached yet. Select a node name in the database tree above.</p>
+  }
+</section>

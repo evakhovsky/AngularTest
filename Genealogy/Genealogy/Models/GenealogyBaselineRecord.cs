@@ -1,16 +1,11 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace Genealogy.Models;
 
-public class GenealogyUpdateRequest
+public class GenealogyBaselineRecord
 {
-    [Required]
-    [StringLength(255)]
+    public int RecordID { get; set; }
+    public string ParentID { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-
     public int BirthYear { get; set; }
-
-    [Required]
-    [StringLength(255)]
     public string GenerationTitle { get; set; } = string.Empty;
+    public bool IsDeleted { get; set; }
 }

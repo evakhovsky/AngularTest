@@ -7,23 +7,35 @@ export interface GenealogyNode {
   birthYear: number;
   generationTitle: string;
   hasChildren: boolean;
+  isDeleted: boolean;
 }
 
-export interface GenealogyTreeDataSource {
-  getRoots(): Observable<GenealogyNode[]>;
-  getChildren(parent: GenealogyNode): Observable<GenealogyNode[]>;
-  createChild(
-    parentID: string,
-    child: Pick<GenealogyNode, 'name' | 'birthYear' | 'generationTitle'>,
-  ): Observable<GenealogyActionResult>;
-  deleteRecord(recordID: number): Observable<GenealogyActionResult>;
-  updateRecord(
-    recordID: number,
-    changes: Pick<GenealogyNode, 'name' | 'birthYear' | 'generationTitle'>,
-  ): Observable<GenealogyActionResult>;
+export interface GenealogyChange {
+  recordID: number;
+  parentID: string;
+  name: string;
+  birthYear: number;
+  generationTitle: string;
+  isNew: boolean;
+  isDeleted: boolean;
+}
+
+export interface GenealogyChangeSet {
+  nodes: GenealogyChange[];
 }
 
 export interface GenealogyActionResult {
   success: boolean;
   message: string;
+}
+
+export interface GenealogyApplyResult extends GenealogyActionResult {
+  createdRecords: Array<{ clientRecordID: number; recordID: number }>;
+}
+
+export interface GenealogyDataSource {
+  getRoots(): Observable<GenealogyNode[]>;
+  getChildren(parent: GenealogyNode): Observable<GenealogyNode[]>;
+  applyChanges(changes: GenealogyChangeSet): Observable<GenealogyApplyResult>;
+  reset(): Observable<GenealogyActionResult>;
 }

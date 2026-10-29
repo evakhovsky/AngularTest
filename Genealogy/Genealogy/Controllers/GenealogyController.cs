@@ -27,59 +27,31 @@ public class GenealogyController : ControllerBase
         return _service.GetChildNodesAsync(recordId);
     }
 
-    [HttpPatch("{recordId:int}")]
-    public async Task<ActionResult<GenealogyActionResult>> Update(
-        int recordId,
-        [FromBody] GenealogyUpdateRequest request)
+    [HttpPost("changes")]
+    public async Task<ActionResult<GenealogyApplyResult>> ApplyChanges(
+        [FromBody] GenealogyChangeSetRequest request)
     {
-        var record = await _service.GetByIdAsync(recordId);
-        if (record is null)
-        {
-            return NotFound(new GenealogyActionResult
-            {
-                Success = false,
-                Message = $"Genealogy record {recordId} was not found.",
-            });
-        }
-
-        record.Name = request.Name.Trim();
-        record.BirthYear = request.BirthYear;
-        record.GenerationTitle = request.GenerationTitle.Trim();
-
-        var updated = await _service.UpdateAsync(record);
-        if (!updated)
-        {
-            return NotFound(new GenealogyActionResult
-            {
-                Success = false,
-                Message = $"Genealogy record {recordId} was not found.",
-            });
-        }
-
-        return Ok(new GenealogyActionResult
-        {
-            Success = true,
-            Message = "Genealogy record updated successfully.",
-        });
+        var result = await _service.ApplyChangesAsync(request);
+        return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    [HttpDelete("{recordId:int}")]
-    public async Task<ActionResult<GenealogyActionResult>> Delete(int recordId)
+    [HttpPost("reset")]
+    public async Task<ActionResult<GenealogyActionResult>> Reset()
     {
-        var deleted = await _service.DeleteAsync(recordId);
-        if (!deleted)
+        var reset = await _service.ResetAsync();
+        if (!reset)
         {
-            return NotFound(new GenealogyActionResult
+            return Conflict(new GenealogyActionResult
             {
                 Success = false,
-                Message = $"Genealogy record {recordId} was not found.",
+                Message = "The original genealogy snapshot is not available.",
             });
         }
 
         return Ok(new GenealogyActionResult
         {
             Success = true,
-            Message = "Genealogy record deleted and its children were relinked.",
+            Message = "The genealogy tree was restored to its original snapshot.",
         });
     }
 }

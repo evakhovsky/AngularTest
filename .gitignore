@@ -53,6 +53,7 @@ Genealogy/x64/
 Genealogy/x86/
 Genealogy/**/[Bb]in/
 Genealogy/**/[Oo]bj/
+Genealogy/Genealogy/logs/
 
 # Visual Studio cache, settings, and user files
 .vs/

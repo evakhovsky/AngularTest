@@ -8,4 +8,5 @@ public class GenealogyNodeDto
     public int BirthYear { get; set; }
     public string GenerationTitle { get; set; } = string.Empty;
     public bool HasChildren { get; set; }
+    public bool IsDeleted { get; set; }
 }

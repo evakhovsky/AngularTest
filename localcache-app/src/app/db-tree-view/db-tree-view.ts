@@ -1,34 +1,54 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
-import { GenealogyNode, GenealogyTreeDataSource } from '../shared/genealogy-tree/genealogy-node';
+import {
+  GenealogyActionResult,
+  GenealogyApplyResult,
+  GenealogyChangeSet,
+  GenealogyNode,
+  GenealogyDataSource,
+} from '../shared/genealogy-tree/genealogy-node';
+import { CachedTreeView } from '../shared/genealogy-tree/cached-tree-view';
 import { GenealogyTree } from '../shared/genealogy-tree/genealogy-tree';
 
 @Component({
   selector: 'db-tree-view',
-  imports: [GenealogyTree],
-  template: `<genealogy-tree title="Genealogy Tree" [dataSource]="dataSource" />`,
+  imports: [CachedTreeView, GenealogyTree],
+  template: `
+    <genealogy-tree
+      title="Database Tree View"
+      [dataSource]="dataSource"
+      [reloadVersion]="reloadVersion()"
+      (recordSelected)="onRecordSelected($event)"
+    />
+    <cached-tree-view
+      [dataSource]="dataSource"
+      [selectionPath]="selectedPath()"
+      (treeChanged)="onTreeChanged()"
+    />
+  `,
 })
 export class DBTreeView {
   private readonly http = inject(HttpClient);
 
-  protected readonly dataSource: GenealogyTreeDataSource = {
+  protected readonly selectedPath = signal<GenealogyNode[]>([]);
+  protected readonly reloadVersion = signal(0);
+
+  protected readonly dataSource: GenealogyDataSource = {
     getRoots: () => this.http.get<GenealogyNode[]>('/api/genealogy/roots'),
-    getChildren: (parent) =>
+    getChildren: (parent: GenealogyNode) =>
       this.http.get<GenealogyNode[]>(`/api/genealogy/${parent.recordID}/children`),
-    createChild: (parentID, child) =>
-      this.http.post<{ success: boolean; message: string }>('/api/genealogy', {
-        parentID,
-        ...child,
-      }),
-    deleteRecord: (recordID) =>
-      this.http.delete<{ success: boolean; message: string }>(
-        `/api/genealogy/${recordID}`,
-      ),
-    updateRecord: (recordID, changes) =>
-      this.http.patch<{ success: boolean; message: string }>(
-        `/api/genealogy/${recordID}`,
-        changes,
-      ),
+    applyChanges: (changes: GenealogyChangeSet) =>
+      this.http.post<GenealogyApplyResult>('/api/genealogy/changes', changes),
+    reset: () => this.http.post<GenealogyActionResult>('/api/genealogy/reset', {}),
   };
+
+  protected onRecordSelected(path: GenealogyNode[]): void {
+    this.selectedPath.set(path);
+  }
+
+  protected onTreeChanged(): void {
+    this.selectedPath.set([]);
+    this.reloadVersion.update((version) => version + 1);
+  }
 }
