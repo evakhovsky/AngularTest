@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { PrimeTemplate, TreeNode } from 'primeng/api';
 import { TreeNodeExpandEvent } from 'primeng/types/tree';
 import { Tree } from 'primeng/tree';
+import { firstValueFrom } from 'rxjs';
 
 import { GenealogyNode, GenealogyTreeDataSource } from './genealogy-node';
 
@@ -25,6 +26,7 @@ export class GenealogyTree {
   protected readonly savingRecordId = signal<number | null>(null);
   protected readonly savingOperation = signal<'update' | 'create' | 'delete' | null>(null);
   protected draft = { name: '', birthYear: 0, generationTitle: '' };
+  private readonly expandedRecordIds = new Set<number>();
   protected childDraft: { name: string; birthYear: number | null; generationTitle: string } = {
     name: '',
     birthYear: null,
@@ -37,12 +39,13 @@ export class GenealogyTree {
 
   protected onNodeExpand(event: TreeNodeExpandEvent): void {
     const node = event.node as TreeNode<GenealogyNode>;
-    if (node.children?.length) {
+    const record = node.data;
+    if (!record) {
       return;
     }
 
-    const record = node.data;
-    if (!record) {
+    this.expandedRecordIds.add(record.recordID);
+    if (node.children?.length) {
       return;
     }
 
@@ -55,14 +58,25 @@ export class GenealogyTree {
         node.children = mapped;
         node.leaf = mapped.length === 0;
         record.hasChildren = mapped.length > 0;
+        if (mapped.length === 0) {
+          this.expandedRecordIds.delete(record.recordID);
+        }
         this.nodes.update((nodes) => [...nodes]);
         this.loading.set(false);
       },
       error: (err) => {
         this.error.set(err.message ?? 'Failed to load children');
+        this.expandedRecordIds.delete(record.recordID);
         this.loading.set(false);
       },
     });
+  }
+
+  protected onNodeCollapse(event: TreeNodeExpandEvent): void {
+    const node = event.node as TreeNode<GenealogyNode>;
+    if (node.data) {
+      this.expandedRecordIds.delete(node.data.recordID);
+    }
   }
 
   protected beginEdit(node: TreeNode<GenealogyNode>): void {
@@ -196,6 +210,8 @@ export class GenealogyTree {
       return;
     }
 
+    const expandedRecordIds = new Set(this.expandedRecordIds);
+    expandedRecordIds.delete(record.recordID);
     this.savingRecordId.set(record.recordID);
     this.savingOperation.set('delete');
     this.error.set(null);
@@ -206,11 +222,47 @@ export class GenealogyTree {
         this.savingOperation.set(null);
         if (!result.success) {
           this.error.set(result.message || 'Failed to delete record');
+          this.savingRecordId.set(null);
+          this.savingOperation.set(null);
           return;
         }
 
-        this.nodes.update((nodes) => this.removeNode(nodes, record.recordID));
         this.confirmDeleteId.set(null);
+        this.expandedRecordIds.delete(record.recordID);
+        this.loading.set(true);
+        this.dataSource().getRoots().subscribe({
+          next: (roots) => {
+            const refreshedNodes = roots.map((root) => this.toTreeNode(root));
+            this.nodes.set(refreshedNodes);
+            this.reloadExpandedNodes(refreshedNodes, expandedRecordIds)
+              .then(() => {
+                this.nodes.update((nodes) => [...nodes]);
+                this.loading.set(false);
+                this.savingRecordId.set(null);
+                this.savingOperation.set(null);
+              })
+              .catch((err: unknown) => {
+                this.error.set(
+                  err instanceof Error
+                    ? `Record deleted, but the displayed tree could not be fully refreshed: ${err.message}`
+                    : 'Record deleted, but the displayed tree could not be fully refreshed',
+                );
+                this.loading.set(false);
+                this.savingRecordId.set(null);
+                this.savingOperation.set(null);
+              });
+          },
+          error: (err: unknown) => {
+            this.error.set(
+              err instanceof Error
+                ? `Record deleted, but the tree could not be refreshed: ${err.message}`
+                : 'Record deleted, but the tree could not be refreshed',
+            );
+            this.loading.set(false);
+            this.savingRecordId.set(null);
+            this.savingOperation.set(null);
+          },
+        });
       },
       error: (err: unknown) => {
         this.error.set(err instanceof Error ? err.message : 'Failed to delete record');
@@ -297,29 +349,22 @@ export class GenealogyTree {
     };
   }
 
-  private removeNode(
+  private async reloadExpandedNodes(
     nodes: TreeNode<GenealogyNode>[],
-    recordID: number,
-  ): TreeNode<GenealogyNode>[] {
-    return nodes
-      .filter((node) => node.data?.recordID !== recordID)
-      .map((node) => {
-        if (!node.children) {
-          return node;
-        }
+    expandedRecordIds: Set<number>,
+  ): Promise<void> {
+    for (const node of nodes) {
+      const record = node.data;
+      if (!record || !expandedRecordIds.has(record.recordID)) {
+        continue;
+      }
 
-        const children = this.removeNode(node.children, recordID);
-        if (children.length === node.children.length) {
-          return node;
-        }
-
-        const hasChildren = children.length > 0;
-        return {
-          ...node,
-          data: node.data ? { ...node.data, hasChildren } : node.data,
-          children,
-          leaf: !hasChildren,
-        };
-      });
+      const children = await firstValueFrom(this.dataSource().getChildren(record));
+      node.children = children.map((child) => this.toTreeNode(child));
+      node.leaf = node.children.length === 0;
+      record.hasChildren = node.children.length > 0;
+      node.expanded = true;
+      await this.reloadExpandedNodes(node.children, expandedRecordIds);
+    }
   }
 }

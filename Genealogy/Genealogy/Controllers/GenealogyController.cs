@@ -62,4 +62,24 @@ public class GenealogyController : ControllerBase
             Message = "Genealogy record updated successfully.",
         });
     }
+
+    [HttpDelete("{recordId:int}")]
+    public async Task<ActionResult<GenealogyActionResult>> Delete(int recordId)
+    {
+        var deleted = await _service.DeleteAsync(recordId);
+        if (!deleted)
+        {
+            return NotFound(new GenealogyActionResult
+            {
+                Success = false,
+                Message = $"Genealogy record {recordId} was not found.",
+            });
+        }
+
+        return Ok(new GenealogyActionResult
+        {
+            Success = true,
+            Message = "Genealogy record deleted and its children were relinked.",
+        });
+    }
 }

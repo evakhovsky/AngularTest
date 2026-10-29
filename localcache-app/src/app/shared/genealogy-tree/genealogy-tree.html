@@ -10,6 +10,7 @@
     [lazy]="true"
     [loading]="loading()"
     (onNodeExpand)="onNodeExpand($event)"
+    (onNodeCollapse)="onNodeCollapse($event)"
   >
     <ng-template pTemplate="default" let-node>
       <div class="node-row" (click)="$event.stopPropagation()">

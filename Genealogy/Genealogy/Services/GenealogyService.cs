@@ -103,6 +103,15 @@ public class GenealogyService : IGenealogyService
             return false;
         }
 
+        var children = await _context.Genealogy
+            .Where(record => record.ParentID == recordId.ToString())
+            .ToListAsync();
+
+        foreach (var child in children)
+        {
+            child.ParentID = existing.ParentID;
+        }
+
         _context.Genealogy.Remove(existing);
         await _context.SaveChangesAsync();
         return true;
