@@ -1,4 +1,4 @@
-<section class="card">
+<section class="card" [attr.aria-busy]="loading() || savingOperation() !== null">
   <h2>{{ title() }}</h2>
 
   @if (error()) {
@@ -13,26 +13,46 @@
   >
     <ng-template pTemplate="default" let-node>
       <div class="node-row" (click)="$event.stopPropagation()">
+        @if (savingRecordId() === node.data.recordID) {
+          <span class="operation-status" role="status" aria-live="polite">
+            <span class="operation-spinner" aria-hidden="true"></span>
+            {{ operationStatus() }}
+          </span>
+        }
+
         @if (editingRecordId() === node.data.recordID) {
           <div class="node-editor">
             <label>
               Name
-              <input aria-label="Name" [(ngModel)]="draft.name" />
+              <input
+                aria-label="Name"
+                [disabled]="savingRecordId() !== null"
+                [(ngModel)]="draft.name"
+              />
             </label>
             <label>
               Birth year
-              <input aria-label="Birth year" type="number" [(ngModel)]="draft.birthYear" />
+              <input
+                aria-label="Birth year"
+                type="number"
+                [disabled]="savingRecordId() !== null"
+                [(ngModel)]="draft.birthYear"
+              />
             </label>
             <label>
               Generation title
-              <input aria-label="Generation title" [(ngModel)]="draft.generationTitle" />
+              <input
+                aria-label="Generation title"
+                [disabled]="savingRecordId() !== null"
+                [(ngModel)]="draft.generationTitle"
+              />
             </label>
             <button
               type="button"
               [disabled]="savingRecordId() !== null"
               (click)="saveChanges(node)"
             >
-              Save
+              {{ savingOperation() === 'update' ? 'Saving...' : 'Save' }}
             </button>
             <button
               type="button"
@@ -46,7 +66,11 @@
           <div class="node-editor">
             <label>
               Child name
-              <input aria-label="Child name" [(ngModel)]="childDraft.name" />
+              <input
+                aria-label="Child name"
+                [disabled]="savingRecordId() !== null"
+                [(ngModel)]="childDraft.name"
+              />
             </label>
             <label>
               Birth year
@@ -55,6 +79,7 @@
                 type="number"
                 step="1"
                 required
+                [disabled]="savingRecordId() !== null"
                 [(ngModel)]="childDraft.birthYear"
               />
             </label>
@@ -62,6 +87,7 @@
               Generation title
               <input
                 aria-label="Child generation title"
+                [disabled]="savingRecordId() !== null"
                 [(ngModel)]="childDraft.generationTitle"
               />
             </label>
@@ -70,7 +96,7 @@
               [disabled]="savingRecordId() !== null"
               (click)="saveChild(node)"
             >
-              Save
+              {{ savingOperation() === 'create' ? 'Adding...' : 'Save' }}
             </button>
             <button
               type="button"
@@ -87,7 +113,7 @@
             [disabled]="savingRecordId() !== null"
             (click)="deleteNode(node)"
           >
-            Confirm delete
+            {{ savingOperation() === 'delete' ? 'Deleting...' : 'Confirm delete' }}
           </button>
           <button
             type="button"

@@ -30,3 +30,26 @@ h2 {
   display: grid;
   gap: 0.25rem;
 }
+
+.operation-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #555;
+  font-size: 0.875rem;
+}
+
+.operation-spinner {
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 2px solid #ccc;
+  border-top-color: #333;
+  border-radius: 50%;
+  animation: operation-spin 0.7s linear infinite;
+}
+
+@keyframes operation-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

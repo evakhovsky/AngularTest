@@ -23,6 +23,7 @@ export class GenealogyTree {
   protected readonly addingChildToId = signal<number | null>(null);
   protected readonly confirmDeleteId = signal<number | null>(null);
   protected readonly savingRecordId = signal<number | null>(null);
+  protected readonly savingOperation = signal<'update' | 'create' | 'delete' | null>(null);
   protected draft = { name: '', birthYear: 0, generationTitle: '' };
   protected childDraft: { name: string; birthYear: number | null; generationTitle: string } = {
     name: '',
@@ -125,6 +126,7 @@ export class GenealogyTree {
     };
 
     this.savingRecordId.set(parent.recordID);
+    this.savingOperation.set('create');
     this.error.set(null);
 
     this.dataSource().createChild(String(parent.recordID), newChild).subscribe({
@@ -132,6 +134,7 @@ export class GenealogyTree {
         if (!result.success) {
           this.error.set(result.message || 'Failed to add child');
           this.savingRecordId.set(null);
+          this.savingOperation.set(null);
           return;
         }
 
@@ -148,6 +151,7 @@ export class GenealogyTree {
             this.nodes.update((nodes) => [...nodes]);
             this.loading.set(false);
             this.savingRecordId.set(null);
+            this.savingOperation.set(null);
           },
           error: (err: unknown) => {
             this.error.set(
@@ -157,12 +161,14 @@ export class GenealogyTree {
             );
             this.loading.set(false);
             this.savingRecordId.set(null);
+            this.savingOperation.set(null);
           },
         });
       },
       error: (err: unknown) => {
         this.error.set(err instanceof Error ? err.message : 'Failed to add child');
         this.savingRecordId.set(null);
+        this.savingOperation.set(null);
       },
     });
   }
@@ -191,11 +197,13 @@ export class GenealogyTree {
     }
 
     this.savingRecordId.set(record.recordID);
+    this.savingOperation.set('delete');
     this.error.set(null);
 
     this.dataSource().deleteRecord(record.recordID).subscribe({
       next: (result) => {
         this.savingRecordId.set(null);
+        this.savingOperation.set(null);
         if (!result.success) {
           this.error.set(result.message || 'Failed to delete record');
           return;
@@ -207,6 +215,7 @@ export class GenealogyTree {
       error: (err: unknown) => {
         this.error.set(err instanceof Error ? err.message : 'Failed to delete record');
         this.savingRecordId.set(null);
+        this.savingOperation.set(null);
       },
     });
   }
@@ -224,11 +233,13 @@ export class GenealogyTree {
     }
 
     this.savingRecordId.set(record.recordID);
+    this.savingOperation.set('update');
     this.error.set(null);
 
     this.dataSource().updateRecord(record.recordID, changes).subscribe({
       next: (result) => {
         this.savingRecordId.set(null);
+        this.savingOperation.set(null);
         if (!result.success) {
           this.error.set(result.message || 'Failed to save changes');
           return;
@@ -242,8 +253,22 @@ export class GenealogyTree {
       error: (err: unknown) => {
         this.error.set(err instanceof Error ? err.message : 'Failed to save changes');
         this.savingRecordId.set(null);
+        this.savingOperation.set(null);
       },
     });
+  }
+
+  protected operationStatus(): string {
+    switch (this.savingOperation()) {
+      case 'update':
+        return 'Saving changes...';
+      case 'create':
+        return 'Adding child...';
+      case 'delete':
+        return 'Deleting record...';
+      default:
+        return '';
+    }
   }
 
   private loadRoots(): void {
