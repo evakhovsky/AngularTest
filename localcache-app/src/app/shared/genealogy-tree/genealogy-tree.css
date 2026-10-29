@@ -14,3 +14,19 @@ h2 {
 .error {
   color: #b00020;
 }
+
+.node-row,
+.node-editor {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.node-editor {
+  flex-wrap: wrap;
+}
+
+.node-editor label {
+  display: grid;
+  gap: 0.25rem;
+}

@@ -10,5 +10,119 @@
     [lazy]="true"
     [loading]="loading()"
     (onNodeExpand)="onNodeExpand($event)"
-  />
+  >
+    <ng-template pTemplate="default" let-node>
+      <div class="node-row" (click)="$event.stopPropagation()">
+        @if (editingRecordId() === node.data.recordID) {
+          <div class="node-editor">
+            <label>
+              Name
+              <input aria-label="Name" [(ngModel)]="draft.name" />
+            </label>
+            <label>
+              Birth year
+              <input aria-label="Birth year" type="number" [(ngModel)]="draft.birthYear" />
+            </label>
+            <label>
+              Generation title
+              <input aria-label="Generation title" [(ngModel)]="draft.generationTitle" />
+            </label>
+            <button
+              type="button"
+              [disabled]="savingRecordId() !== null"
+              (click)="saveChanges(node)"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              [disabled]="savingRecordId() !== null"
+              (click)="cancelEdit()"
+            >
+              Cancel
+            </button>
+          </div>
+        } @else if (addingChildToId() === node.data.recordID) {
+          <div class="node-editor">
+            <label>
+              Child name
+              <input aria-label="Child name" [(ngModel)]="childDraft.name" />
+            </label>
+            <label>
+              Birth year
+              <input
+                aria-label="Child birth year"
+                type="number"
+                step="1"
+                required
+                [(ngModel)]="childDraft.birthYear"
+              />
+            </label>
+            <label>
+              Generation title
+              <input
+                aria-label="Child generation title"
+                [(ngModel)]="childDraft.generationTitle"
+              />
+            </label>
+            <button
+              type="button"
+              [disabled]="savingRecordId() !== null"
+              (click)="saveChild(node)"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              [disabled]="savingRecordId() !== null"
+              (click)="cancelAddChild()"
+            >
+              Cancel
+            </button>
+          </div>
+        } @else if (confirmDeleteId() === node.data.recordID) {
+          <span>Delete {{ node.data.name }}?</span>
+          <button
+            type="button"
+            [disabled]="savingRecordId() !== null"
+            (click)="deleteNode(node)"
+          >
+            Confirm delete
+          </button>
+          <button
+            type="button"
+            [disabled]="savingRecordId() !== null"
+            (click)="cancelDelete()"
+          >
+            Cancel
+          </button>
+        } @else {
+          <span>
+            {{ node.data.name }} ({{ node.data.birthYear }}) — {{ node.data.generationTitle }}
+          </span>
+          <button
+            type="button"
+            [disabled]="savingRecordId() !== null"
+            (click)="beginEdit(node)"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            [disabled]="savingRecordId() !== null"
+            (click)="beginAddChild(node)"
+          >
+            {{ node.data.hasChildren || node.children?.length ? 'Insert' : 'Add' }}
+          </button>
+          <button
+            type="button"
+            [disabled]="savingRecordId() !== null"
+            (click)="requestDelete(node)"
+          >
+            Delete
+          </button>
+        }
+      </div>
+    </ng-template>
+  </p-tree>
 </section>

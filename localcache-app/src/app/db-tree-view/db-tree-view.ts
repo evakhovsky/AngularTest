@@ -16,5 +16,19 @@ export class DBTreeView {
     getRoots: () => this.http.get<GenealogyNode[]>('/api/genealogy/roots'),
     getChildren: (parent) =>
       this.http.get<GenealogyNode[]>(`/api/genealogy/${parent.recordID}/children`),
+    createChild: (parentID, child) =>
+      this.http.post<{ success: boolean; message: string }>('/api/genealogy', {
+        parentID,
+        ...child,
+      }),
+    deleteRecord: (recordID) =>
+      this.http.delete<{ success: boolean; message: string }>(
+        `/api/genealogy/${recordID}`,
+      ),
+    updateRecord: (recordID, changes) =>
+      this.http.patch<{ success: boolean; message: string }>(
+        `/api/genealogy/${recordID}`,
+        changes,
+      ),
   };
 }
