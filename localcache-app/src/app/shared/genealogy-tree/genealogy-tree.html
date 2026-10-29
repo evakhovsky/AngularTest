@@ -1,0 +1,14 @@
+<section class="card">
+  <h2>{{ title() }}</h2>
+
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+
+  <p-tree
+    [value]="nodes()"
+    [lazy]="true"
+    [loading]="loading()"
+    (onNodeExpand)="onNodeExpand($event)"
+  />
+</section>

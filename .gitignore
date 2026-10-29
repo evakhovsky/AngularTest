@@ -1,0 +1,66 @@
+# See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# Compiled output
+localcache-app/dist
+localcache-app/tmp
+localcache-app/out-tsc
+localcache-app/bazel-out
+localcache-app/.angular/cache/
+
+# Node
+localcache-app/node_modules
+localcache-app/npm-debug.log
+localcache-app/yarn-error.log
+
+# IDEs and editors
+localcache-app/.idea/
+localcache-app/.project
+localcache-app/.classpath
+localcache-app/.c9/
+localcache-app/*.launch
+localcache-app/.settings/
+localcache-app/*.sublime-workspace
+
+# Visual Studio Code
+Genealogy/.vscode/*
+Genealogy/!.vscode/settings.json
+Genealogy/!.vscode/tasks.json
+Genealogy/!.vscode/launch.json
+Genealogy/!.vscode/extensions.json
+Genealogy/.history/*
+
+# Miscellaneous
+/.angular/cache
+.sass-cache/
+/connect.lock
+/coverage
+/libpeerconnection.log
+Genealogy/testem.log
+/typings
+__screenshots__/
+
+# System files
+Genealogy/.DS_Store
+Genealogy/Thumbs.db
+
+# =========================================================================
+# .NET / VISUAL STUDIO RULES
+# =========================================================================
+# Build outputs
+Genealogy/[Dd]ebug/
+Genealogy/[Rr]elease/
+Genealogy/x64/
+Genealogy/x86/
+Genealogy/[Bb]in/
+Genealogy/[Oo]bj/
+
+# Visual Studio cache, settings, and user files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / Resharper / VS Code settings
+Genealogy/.idea/
+Genealogy/.vscode/
