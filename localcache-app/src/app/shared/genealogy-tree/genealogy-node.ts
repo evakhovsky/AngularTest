@@ -1,5 +1,3 @@
-import { Observable } from 'rxjs';
-
 export interface GenealogyNode {
   recordID: number;
   parentID: string;
@@ -36,11 +34,4 @@ export interface GenealogyApplyResult extends GenealogyActionResult {
 export interface GenealogyChangesApplied {
   changes: GenealogyChange[];
   result: GenealogyApplyResult;
-}
-
-export interface GenealogyDataSource {
-  getRoots(): Observable<GenealogyNode[]>;
-  getChildren(parent: GenealogyNode): Observable<GenealogyNode[]>;
-  applyChanges(changes: GenealogyChangeSet): Observable<GenealogyApplyResult>;
-  reset(): Observable<GenealogyActionResult>;
 }

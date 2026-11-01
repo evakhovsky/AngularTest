@@ -1,4 +1,5 @@
-import { Component, afterNextRender, effect, input, output, signal } from '@angular/core';
+import { Component, afterNextRender, inject, input, output, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PrimeTemplate, TreeNode } from 'primeng/api';
 import { TreeNodeExpandEvent } from 'primeng/types/tree';
 import { Tree } from 'primeng/tree';
@@ -6,8 +7,8 @@ import { Tree } from 'primeng/tree';
 import {
   GenealogyChangesApplied,
   GenealogyNode,
-  GenealogyDataSource,
 } from './genealogy-node';
+import { GenealogyDataService } from './genealogy-data.service';
 
 @Component({
   selector: 'genealogy-tree',
@@ -16,37 +17,24 @@ import {
   styleUrl: './genealogy-tree.css',
 })
 export class GenealogyTree {
-  readonly dataSource = input.required<GenealogyDataSource>();
   readonly title = input('Genealogy Tree');
-  readonly reloadVersion = input(0);
-  readonly appliedChanges = input<GenealogyChangesApplied | null>(null);
   readonly recordSelected = output<GenealogyNode[]>();
 
+  private readonly genealogyData = inject(GenealogyDataService);
   protected readonly nodes = signal<TreeNode<GenealogyNode>[]>([]);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
-  private lastReloadVersion: number | null = null;
   private readonly loadedRecords = new Map<number, GenealogyNode>();
   private readonly loadedNodes = new Map<number, TreeNode<GenealogyNode>>();
   private readonly loadedBranches = new Set<number>();
-  private lastAppliedChanges: GenealogyChangesApplied | null = null;
 
   constructor() {
-    effect(() => {
-      const appliedChanges = this.appliedChanges();
-      if (appliedChanges && appliedChanges !== this.lastAppliedChanges) {
-        this.lastAppliedChanges = appliedChanges;
-        this.applyChangesToLoadedTree(appliedChanges);
-      }
-
-      const version = this.reloadVersion();
-      if (this.lastReloadVersion === null) {
-        this.lastReloadVersion = version;
-      } else if (this.lastReloadVersion !== version) {
-        this.lastReloadVersion = version;
-        this.loadRoots();
-      }
-    });
+    this.genealogyData.changesApplied$
+      .pipe(takeUntilDestroyed())
+      .subscribe((changes) => this.applyChangesToLoadedTree(changes));
+    this.genealogyData.databaseReset$
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => this.loadRoots());
 
     afterNextRender(() => this.loadRoots());
   }
@@ -61,7 +49,7 @@ export class GenealogyTree {
     this.loading.set(true);
     this.error.set(null);
 
-    this.dataSource().getChildren(record).subscribe({
+    this.genealogyData.getChildren(record).subscribe({
       next: (children) => {
         node.children = children.map((child) => this.toTreeNode(child));
         node.leaf = node.children.length === 0;
@@ -96,7 +84,7 @@ export class GenealogyTree {
     this.loadedNodes.clear();
     this.loadedBranches.clear();
 
-    this.dataSource().getRoots().subscribe({
+    this.genealogyData.getRoots().subscribe({
       next: (roots) => {
         this.nodes.set(roots.map((root) => this.toTreeNode(root)));
         this.loading.set(false);

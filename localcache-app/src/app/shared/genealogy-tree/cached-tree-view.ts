@@ -1,4 +1,4 @@
-import { Component, computed, effect, input, output, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { PrimeTemplate, TreeNode } from 'primeng/api';
@@ -8,8 +8,8 @@ import {
   GenealogyChange,
   GenealogyChangesApplied,
   GenealogyNode,
-  GenealogyDataSource,
 } from './genealogy-node';
+import { GenealogyDataService } from './genealogy-data.service';
 
 interface CachedTreeEntry extends Omit<GenealogyNode, 'birthYear'> {
   birthYear: number | null;
@@ -24,11 +24,9 @@ interface CachedTreeEntry extends Omit<GenealogyNode, 'birthYear'> {
   styleUrl: './cached-tree-view.css',
 })
 export class CachedTreeView {
-  readonly dataSource = input.required<GenealogyDataSource>();
   readonly selectionPath = input<GenealogyNode[]>([]);
-  readonly changesApplied = output<GenealogyChangesApplied>();
-  readonly databaseReset = output<void>();
 
+  private readonly genealogyData = inject(GenealogyDataService);
   protected readonly applying = signal(false);
   protected readonly resetting = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -157,7 +155,7 @@ export class CachedTreeView {
     this.error.set(null);
     this.message.set(null);
 
-    this.dataSource().applyChanges({ nodes: changes }).subscribe({
+    this.genealogyData.applyChanges({ nodes: changes }).subscribe({
       next: (result) => {
         this.applying.set(false);
         if (!result.success) {
@@ -167,7 +165,7 @@ export class CachedTreeView {
 
         this.clearCache();
         this.message.set(result.message || 'Staged changes applied.');
-        this.changesApplied.emit({ changes, result });
+        this.genealogyData.notifyChangesApplied({ changes, result });
       },
       error: (err: unknown) => {
         this.applying.set(false);
@@ -196,7 +194,7 @@ export class CachedTreeView {
     this.error.set(null);
     this.message.set(null);
 
-    this.dataSource().reset().subscribe({
+    this.genealogyData.reset().subscribe({
       next: (result) => {
         this.resetting.set(false);
         this.confirmReset.set(false);
@@ -207,7 +205,7 @@ export class CachedTreeView {
 
         this.clearCache();
         this.message.set(result.message || 'The genealogy tree was reset.');
-        this.databaseReset.emit();
+        this.genealogyData.notifyDatabaseReset();
       },
       error: (err: unknown) => {
         this.resetting.set(false);
