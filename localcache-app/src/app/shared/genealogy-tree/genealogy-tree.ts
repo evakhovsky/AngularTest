@@ -3,7 +3,11 @@ import { PrimeTemplate, TreeNode } from 'primeng/api';
 import { TreeNodeExpandEvent } from 'primeng/types/tree';
 import { Tree } from 'primeng/tree';
 
-import { GenealogyNode, GenealogyDataSource } from './genealogy-node';
+import {
+  GenealogyChangesApplied,
+  GenealogyNode,
+  GenealogyDataSource,
+} from './genealogy-node';
 
 @Component({
   selector: 'genealogy-tree',
@@ -15,6 +19,7 @@ export class GenealogyTree {
   readonly dataSource = input.required<GenealogyDataSource>();
   readonly title = input('Genealogy Tree');
   readonly reloadVersion = input(0);
+  readonly appliedChanges = input<GenealogyChangesApplied | null>(null);
   readonly recordSelected = output<GenealogyNode[]>();
 
   protected readonly nodes = signal<TreeNode<GenealogyNode>[]>([]);
@@ -22,9 +27,18 @@ export class GenealogyTree {
   protected readonly error = signal<string | null>(null);
   private lastReloadVersion: number | null = null;
   private readonly loadedRecords = new Map<number, GenealogyNode>();
+  private readonly loadedNodes = new Map<number, TreeNode<GenealogyNode>>();
+  private readonly loadedBranches = new Set<number>();
+  private lastAppliedChanges: GenealogyChangesApplied | null = null;
 
   constructor() {
     effect(() => {
+      const appliedChanges = this.appliedChanges();
+      if (appliedChanges && appliedChanges !== this.lastAppliedChanges) {
+        this.lastAppliedChanges = appliedChanges;
+        this.applyChangesToLoadedTree(appliedChanges);
+      }
+
       const version = this.reloadVersion();
       if (this.lastReloadVersion === null) {
         this.lastReloadVersion = version;
@@ -52,6 +66,7 @@ export class GenealogyTree {
         node.children = children.map((child) => this.toTreeNode(child));
         node.leaf = node.children.length === 0;
         record.hasChildren = node.children.length > 0;
+        this.loadedBranches.add(record.recordID);
         this.nodes.update((nodes) => [...nodes]);
         this.loading.set(false);
       },
@@ -78,6 +93,8 @@ export class GenealogyTree {
     this.loading.set(true);
     this.error.set(null);
     this.loadedRecords.clear();
+    this.loadedNodes.clear();
+    this.loadedBranches.clear();
 
     this.dataSource().getRoots().subscribe({
       next: (roots) => {
@@ -131,12 +148,187 @@ export class GenealogyTree {
 
   private toTreeNode(record: GenealogyNode): TreeNode<GenealogyNode> {
     this.loadedRecords.set(record.recordID, record);
-    return {
+    const node: TreeNode<GenealogyNode> = {
       key: String(record.recordID),
       label: `${record.name} (${record.birthYear})`,
       data: record,
       leaf: !record.hasChildren,
       children: [],
     };
+    this.loadedNodes.set(record.recordID, node);
+    return node;
+  }
+
+  private applyChangesToLoadedTree(batch: GenealogyChangesApplied): void {
+    const createdIDs = new Map(
+      batch.result.createdRecords.map(({ clientRecordID, recordID }) => [
+        clientRecordID,
+        recordID,
+      ]),
+    );
+    const resolveID = (id: string): number => {
+      const parsedID = Number(id);
+      return parsedID < 0 ? (createdIDs.get(parsedID) ?? parsedID) : parsedID;
+    };
+    const deletedIDs = new Set(
+      batch.changes
+        .filter((change) => change.isDeleted)
+        .map((change) => createdIDs.get(change.recordID) ?? change.recordID),
+    );
+
+    for (const change of batch.changes) {
+      if (change.isNew || change.isDeleted) {
+        continue;
+      }
+
+      const node = this.loadedNodes.get(change.recordID);
+      if (!node?.data) {
+        continue;
+      }
+
+      node.data.parentID = String(resolveID(change.parentID));
+      node.data.name = change.name;
+      node.data.birthYear = change.birthYear;
+      node.data.generationTitle = change.generationTitle;
+      node.label = `${change.name} (${change.birthYear})`;
+    }
+
+    const newNodes = new Map<number, TreeNode<GenealogyNode>>();
+    for (const change of batch.changes.filter((entry) => entry.isNew)) {
+      const recordID = createdIDs.get(change.recordID);
+      if (recordID === undefined) {
+        continue;
+      }
+
+      const hasNewChildren = batch.changes.some(
+        (candidate) => candidate.isNew && resolveID(candidate.parentID) === recordID,
+      );
+      const record: GenealogyNode = {
+        recordID,
+        parentID: String(resolveID(change.parentID)),
+        name: change.name,
+        birthYear: change.birthYear,
+        generationTitle: change.generationTitle,
+        hasChildren: hasNewChildren,
+        isDeleted: false,
+      };
+      newNodes.set(recordID, {
+        key: String(recordID),
+        label: `${record.name} (${record.birthYear})`,
+        data: record,
+        expanded: hasNewChildren,
+        leaf: !hasNewChildren,
+        children: [],
+      });
+    }
+
+    for (const change of batch.changes.filter((entry) => entry.isNew)) {
+      const recordID = createdIDs.get(change.recordID);
+      const node = recordID === undefined ? undefined : newNodes.get(recordID);
+      if (!node?.data) {
+        continue;
+      }
+
+      const parentID = Number(node.data.parentID);
+      const newParent = newNodes.get(parentID);
+      if (newParent) {
+        continue;
+      }
+
+      const existingParent = this.loadedNodes.get(parentID);
+      if (parentID === 0 || (existingParent && this.loadedBranches.has(parentID))) {
+        this.registerNewSubtree(node, newNodes);
+      }
+      if (existingParent?.data) {
+        existingParent.data.hasChildren = true;
+        existingParent.leaf = false;
+      }
+    }
+
+    const pendingDeletes = [...deletedIDs];
+    while (pendingDeletes.length) {
+      const parentID = pendingDeletes.pop();
+      if (parentID === undefined) {
+        continue;
+      }
+
+      for (const node of this.loadedNodes.values()) {
+        const childID = node.data?.recordID;
+        if (
+          childID !== undefined &&
+          Number(node.data?.parentID) === parentID &&
+          !deletedIDs.has(childID)
+        ) {
+          deletedIDs.add(childID);
+          pendingDeletes.push(childID);
+        }
+      }
+    }
+
+    for (const recordID of deletedIDs) {
+      this.loadedNodes.delete(recordID);
+      this.loadedRecords.delete(recordID);
+      this.loadedBranches.delete(recordID);
+    }
+
+    for (const recordID of [...this.loadedBranches]) {
+      const parent = this.loadedNodes.get(recordID);
+      if (!parent?.data) {
+        continue;
+      }
+
+      const children = [...this.loadedNodes.values()]
+        .filter((node) => Number(node.data?.parentID) === recordID)
+        .sort(
+          (left, right) =>
+            (left.data?.birthYear ?? Number.MAX_SAFE_INTEGER) -
+            (right.data?.birthYear ?? Number.MAX_SAFE_INTEGER),
+        );
+      parent.children = children;
+      parent.data.hasChildren = children.length > 0;
+      parent.leaf = children.length === 0;
+      for (const child of children) {
+        child.parent = parent;
+      }
+    }
+
+    const roots = [...this.loadedNodes.values()]
+      .filter((node) => Number(node.data?.parentID) === 0)
+      .sort(
+        (left, right) =>
+          (left.data?.birthYear ?? Number.MAX_SAFE_INTEGER) -
+          (right.data?.birthYear ?? Number.MAX_SAFE_INTEGER),
+      );
+    for (const root of roots) {
+      root.parent = undefined;
+    }
+    this.nodes.set(roots);
+  }
+
+  private registerNewSubtree(
+    node: TreeNode<GenealogyNode>,
+    newNodes: Map<number, TreeNode<GenealogyNode>>,
+  ): void {
+    const record = node.data;
+    if (!record || this.loadedNodes.has(record.recordID)) {
+      return;
+    }
+
+    this.loadedNodes.set(record.recordID, node);
+    this.loadedRecords.set(record.recordID, record);
+    for (const child of newNodes.values()) {
+      if (Number(child.data?.parentID) === record.recordID) {
+        node.children ??= [];
+        node.children.push(child);
+        node.children.sort(
+          (left, right) =>
+            (left.data?.birthYear ?? Number.MAX_SAFE_INTEGER) -
+            (right.data?.birthYear ?? Number.MAX_SAFE_INTEGER),
+        );
+        child.parent = node;
+        this.loadedBranches.add(record.recordID);
+        this.registerNewSubtree(child, newNodes);
+      }
+    }
   }
 }

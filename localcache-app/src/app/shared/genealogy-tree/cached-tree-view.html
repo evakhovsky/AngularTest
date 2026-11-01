@@ -59,14 +59,14 @@
         } @else {
           <div
             class="cached-entry"
-            [class.pending-deletion]="node.data.isDeleted"
-            [class.modified]="isChanged(node.data) && !node.data.isDeleted"
+            [class.pending-deletion]="isMarkedForDeletion(node.data)"
+            [class.modified]="isChanged(node.data) && !isMarkedForDeletion(node.data)"
           >
             <div class="entry-fields">
               <label>
                 Name
                 <input
-                  [disabled]="node.data.isDeleted || applying() || resetting()"
+                  [disabled]="isMarkedForDeletion(node.data) || applying() || resetting()"
                   [(ngModel)]="node.data.name"
                   (ngModelChange)="onFieldChanged()"
                 />
@@ -76,7 +76,7 @@
                 <input
                   type="number"
                   step="1"
-                  [disabled]="node.data.isDeleted || applying() || resetting()"
+                  [disabled]="isMarkedForDeletion(node.data) || applying() || resetting()"
                   [(ngModel)]="node.data.birthYear"
                   (ngModelChange)="onFieldChanged()"
                 />
@@ -84,7 +84,7 @@
               <label>
                 Generation title
                 <input
-                  [disabled]="node.data.isDeleted || applying() || resetting()"
+                  [disabled]="isMarkedForDeletion(node.data) || applying() || resetting()"
                   [(ngModel)]="node.data.generationTitle"
                   (ngModelChange)="onFieldChanged()"
                 />
@@ -95,30 +95,42 @@
                 <span class="change-marker">New</span>
               } @else if (node.data.isDeleted) {
                 <span class="delete-marker">Marked for deletion</span>
+              } @else if (isMarkedForDeletion(node.data)) {
+                <span class="delete-marker">Will be deleted with ancestor</span>
               } @else if (isChanged(node.data)) {
                 <span class="change-marker">Modified</span>
               }
               <button
                 type="button"
-                [disabled]="node.data.isDeleted || applying() || resetting()"
+                [disabled]="isMarkedForDeletion(node.data) || applying() || resetting()"
                 (click)="addChild(node.data)"
               >
                 Add child
               </button>
               <button
                 type="button"
-                [disabled]="node.data.isDeleted || applying() || resetting()"
+                [disabled]="isMarkedForDeletion(node.data) || applying() || resetting()"
                 (click)="addSibling(node.data)"
               >
                 Add sibling
               </button>
-              <button
-                type="button"
-                [disabled]="applying() || resetting()"
-                (click)="toggleDeleted(node.data)"
-              >
-                {{ node.data.isDeleted ? 'Undo delete' : 'Mark for deletion' }}
-              </button>
+              @if (node.data.isDeleted) {
+                <button
+                  type="button"
+                  [disabled]="applying() || resetting()"
+                  (click)="toggleDeleted(node.data)"
+                >
+                  Undo delete
+                </button>
+              } @else if (!isMarkedForDeletion(node.data)) {
+                <button
+                  type="button"
+                  [disabled]="applying() || resetting()"
+                  (click)="toggleDeleted(node.data)"
+                >
+                  Mark for deletion
+                </button>
+              }
               <button
                 type="button"
                 [disabled]="applying() || resetting()"

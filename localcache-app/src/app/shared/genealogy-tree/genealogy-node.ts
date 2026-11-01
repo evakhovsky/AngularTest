@@ -33,6 +33,11 @@ export interface GenealogyApplyResult extends GenealogyActionResult {
   createdRecords: Array<{ clientRecordID: number; recordID: number }>;
 }
 
+export interface GenealogyChangesApplied {
+  changes: GenealogyChange[];
+  result: GenealogyApplyResult;
+}
+
 export interface GenealogyDataSource {
   getRoots(): Observable<GenealogyNode[]>;
   getChildren(parent: GenealogyNode): Observable<GenealogyNode[]>;

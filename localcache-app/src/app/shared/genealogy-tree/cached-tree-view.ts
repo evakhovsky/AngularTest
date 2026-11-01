@@ -6,6 +6,7 @@ import { Tree } from 'primeng/tree';
 
 import {
   GenealogyChange,
+  GenealogyChangesApplied,
   GenealogyNode,
   GenealogyDataSource,
 } from './genealogy-node';
@@ -25,7 +26,8 @@ interface CachedTreeEntry extends Omit<GenealogyNode, 'birthYear'> {
 export class CachedTreeView {
   readonly dataSource = input.required<GenealogyDataSource>();
   readonly selectionPath = input<GenealogyNode[]>([]);
-  readonly treeChanged = output<void>();
+  readonly changesApplied = output<GenealogyChangesApplied>();
+  readonly databaseReset = output<void>();
 
   protected readonly applying = signal(false);
   protected readonly resetting = signal(false);
@@ -48,7 +50,9 @@ export class CachedTreeView {
 
   protected readonly changedCount = computed(() => {
     this.version();
-    return [...this.entries.values()].filter((entry) => this.isChanged(entry)).length;
+    return [...this.entries.values()].filter(
+      (entry) => this.isChanged(entry) && !this.isSuppressedByDeletedAncestor(entry),
+    ).length;
   });
 
   constructor() {
@@ -109,13 +113,19 @@ export class CachedTreeView {
     );
   }
 
+  protected isMarkedForDeletion(entry: CachedTreeEntry): boolean {
+    return entry.isDeleted || this.isSuppressedByDeletedAncestor(entry);
+  }
+
   protected applyChanges(): void {
     if (this.applying() || this.resetting()) {
       return;
     }
 
     const changes: GenealogyChange[] = [...this.entries.values()]
-      .filter((entry) => this.isChanged(entry))
+      .filter(
+        (entry) => this.isChanged(entry) && !this.isSuppressedByDeletedAncestor(entry),
+      )
       .map((entry) => ({
         recordID: entry.recordID,
         parentID: entry.parentID,
@@ -157,7 +167,7 @@ export class CachedTreeView {
 
         this.clearCache();
         this.message.set(result.message || 'Staged changes applied.');
-        this.treeChanged.emit();
+        this.changesApplied.emit({ changes, result });
       },
       error: (err: unknown) => {
         this.applying.set(false);
@@ -174,7 +184,6 @@ export class CachedTreeView {
     this.clearCache();
     this.message.set('Staged changes discarded.');
     this.error.set(null);
-    this.treeChanged.emit();
   }
 
   protected resetDatabase(): void {
@@ -198,7 +207,7 @@ export class CachedTreeView {
 
         this.clearCache();
         this.message.set(result.message || 'The genealogy tree was reset.');
-        this.treeChanged.emit();
+        this.databaseReset.emit();
       },
       error: (err: unknown) => {
         this.resetting.set(false);
@@ -260,6 +269,24 @@ export class CachedTreeView {
     this.error.set(null);
     this.message.set(null);
     this.touch();
+  }
+
+  private isSuppressedByDeletedAncestor(entry: CachedTreeEntry): boolean {
+    let parentID = Number(entry.parentID);
+    const visited = new Set<number>([entry.recordID]);
+
+    while (parentID > 0 && !visited.has(parentID)) {
+      visited.add(parentID);
+      const parentEntry = this.entries.get(parentID);
+      if (parentEntry?.isDeleted) {
+        return true;
+      }
+
+      const parentContext = this.contextRecords.get(parentID);
+      parentID = Number(parentEntry?.parentID ?? parentContext?.parentID ?? 0);
+    }
+
+    return false;
   }
 
   private removeEntry(entry: CachedTreeEntry): void {
@@ -451,7 +478,7 @@ export class CachedTreeView {
         } else {
           projectedRoots.push(node);
         }
-        nextParent = entry.isDeleted ? visibleParent : node;
+        nextParent = node;
         nextGap = null;
       }
 

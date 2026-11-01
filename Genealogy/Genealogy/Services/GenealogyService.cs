@@ -153,22 +153,30 @@ public class GenealogyService : IGenealogyService
             recordsById[deletedID].IsDeleted = true;
         }
 
-        var deletedRecordIDs = records
-            .Where(record => record.IsDeleted)
-            .Select(record => record.RecordID)
-            .ToHashSet();
-        foreach (var record in records.Where(record => !record.IsDeleted))
+        var recordsByParentID = records
+            .GroupBy(record => record.ParentID, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.Ordinal);
+        var pendingDeletes = new Queue<GenealogyRecord>(records.Where(record => record.IsDeleted));
+        var visitedDeletes = new HashSet<int>();
+        var cascadeDeletedCount = 0;
+        while (pendingDeletes.TryDequeue(out var deletedRecord))
         {
-            var visited = new HashSet<int>();
-            while (int.TryParse(record.ParentID, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parentID) &&
-                   deletedRecordIDs.Contains(parentID))
+            if (!visitedDeletes.Add(deletedRecord.RecordID) ||
+                !recordsByParentID.TryGetValue(
+                    deletedRecord.RecordID.ToString(CultureInfo.InvariantCulture),
+                    out var children))
             {
-                if (!visited.Add(parentID) || !recordsById.TryGetValue(parentID, out var deletedParent))
-                {
-                    return Failure($"The parent relationship for record {record.RecordID} is invalid.");
-                }
+                continue;
+            }
 
-                record.ParentID = deletedParent.ParentID;
+            foreach (var child in children)
+            {
+                if (!child.IsDeleted)
+                {
+                    child.IsDeleted = true;
+                    cascadeDeletedCount++;
+                }
+                pendingDeletes.Enqueue(child);
             }
         }
 
@@ -183,10 +191,11 @@ public class GenealogyService : IGenealogyService
 
         _logger.LogInformation(
             "Applied genealogy change set with {ChangedRecordCount} changes, " +
-            "{CreatedRecordCount} created records, and {DeletedRecordCount} deleted records.",
+            "{CreatedRecordCount} created records, and {DeletedDescendantCount} additional " +
+            "descendants deleted.",
             changes.Count,
             createdRecords.Count,
-            deletedIDs.Count);
+            cascadeDeletedCount);
 
         return new GenealogyApplyResult
         {
