@@ -32,7 +32,8 @@ export class CachedTreeView {
   protected readonly error = signal<string | null>(null);
   protected readonly message = signal<string | null>(null);
   protected readonly confirmReset = signal(false);
-  private readonly version = signal(0);
+  private readonly structureVersion = signal(0);
+  private readonly changeVersion = signal(0);
   private readonly entries = new Map<number, CachedTreeEntry>();
   private readonly contextRecords = new Map<number, GenealogyNode>();
   private readonly originals = new Map<
@@ -42,12 +43,12 @@ export class CachedTreeView {
   private nextTemporaryId = -1;
 
   protected readonly treeNodes = computed(() => {
-    this.version();
+    this.structureVersion();
     return this.buildTree();
   });
 
   protected readonly changedCount = computed(() => {
-    this.version();
+    this.changeVersion();
     return [...this.entries.values()].filter(
       (entry) => this.isChanged(entry) && !this.isSuppressedByDeletedAncestor(entry),
     ).length;
@@ -91,7 +92,7 @@ export class CachedTreeView {
   }
 
   protected onFieldChanged(): void {
-    this.touch();
+    this.changeVersion.update((version) => version + 1);
   }
 
   protected isChanged(entry: CachedTreeEntry): boolean {
@@ -354,7 +355,8 @@ export class CachedTreeView {
   }
 
   private touch(): void {
-    this.version.update((version) => version + 1);
+    this.structureVersion.update((version) => version + 1);
+    this.changeVersion.update((version) => version + 1);
   }
 
   private errorMessage(error: unknown, fallback: string): string {

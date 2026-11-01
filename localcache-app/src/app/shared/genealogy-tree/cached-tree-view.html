@@ -69,6 +69,7 @@
                   [disabled]="isMarkedForDeletion(node.data) || applying() || resetting()"
                   [(ngModel)]="node.data.name"
                   (ngModelChange)="onFieldChanged()"
+                  (keydown)="$event.stopPropagation()"
                 />
               </label>
               <label>
@@ -79,6 +80,7 @@
                   [disabled]="isMarkedForDeletion(node.data) || applying() || resetting()"
                   [(ngModel)]="node.data.birthYear"
                   (ngModelChange)="onFieldChanged()"
+                  (keydown)="$event.stopPropagation()"
                 />
               </label>
               <label>
@@ -87,6 +89,7 @@
                   [disabled]="isMarkedForDeletion(node.data) || applying() || resetting()"
                   [(ngModel)]="node.data.generationTitle"
                   (ngModelChange)="onFieldChanged()"
+                  (keydown)="$event.stopPropagation()"
                 />
               </label>
             </div>
