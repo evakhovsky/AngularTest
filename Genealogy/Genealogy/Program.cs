@@ -1,6 +1,6 @@
 using Genealogy.Data;
 using Genealogy.Services;
-using Microsoft.Data.SqlClient;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Serilog.Events;
@@ -25,12 +25,28 @@ builder.Host.UseSerilog((_, loggerConfiguration) =>
             outputTemplate:
                 "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}"));
 
-// Add services to the container.
+var sqliteConnection = new SqliteConnectionStringBuilder(
+    builder.Configuration.GetConnectionString("genealogy")
+    ?? throw new InvalidOperationException("The genealogy connection string is missing."));
+if (sqliteConnection.DataSource != ":memory:" &&
+    !Path.IsPathRooted(sqliteConnection.DataSource))
+{
+    sqliteConnection.DataSource = Path.Combine(
+        builder.Environment.ContentRootPath,
+        sqliteConnection.DataSource);
+}
+
+var databaseDirectory = Path.GetDirectoryName(sqliteConnection.DataSource);
+if (!string.IsNullOrEmpty(databaseDirectory))
+{
+    Directory.CreateDirectory(databaseDirectory);
+}
 
 builder.Services.AddDbContext<GenealogyContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("testdb")));
+    options.UseSqlite(sqliteConnection.ToString()));
 
 builder.Services.AddScoped<IGenealogyService, GenealogyService>();
+builder.Services.AddScoped<GenealogyDatabaseInitializer>();
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -41,6 +57,12 @@ builder.Services.AddCors(o => o.AddPolicy("angular", p =>
 
 var app = builder.Build();
 
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    var initializer = scope.ServiceProvider.GetRequiredService<GenealogyDatabaseInitializer>();
+    await initializer.InitializeAsync();
+}
+
 // Configure the HTTP request pipeline.
 app.UseSerilogRequestLogging();
 
@@ -50,7 +72,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthorization();
 app.UseCors("angular");
