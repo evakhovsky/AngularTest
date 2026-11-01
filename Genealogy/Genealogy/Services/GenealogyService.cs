@@ -136,6 +136,7 @@ public class GenealogyService : IGenealogyService
                 IsDeleted = false,
             };
             records.Add(record);
+            _context.Genealogy.Add(record);
             recordsById.Add(recordID, record);
             createdRecords.Add(new GenealogyCreatedRecord
             {
